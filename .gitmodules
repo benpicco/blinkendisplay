@@ -1,0 +1,3 @@
+[submodule "libraries/LEDMatrix"]
+	path = libraries/LEDMatrix
+	url = git@github.com:AaronLiddiment/LEDMatrix.git
