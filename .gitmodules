@@ -1,3 +1,6 @@
 [submodule "libraries/LEDMatrix"]
 	path = libraries/LEDMatrix
-	url = git@github.com:AaronLiddiment/LEDMatrix.git
+	url = git@github.com:Jorgen-VikingGod/LEDMatrix.git
+[submodule "libraries/FastLED"]
+	path = libraries/FastLED
+	url = git@github.com:FastLED/FastLED.git
