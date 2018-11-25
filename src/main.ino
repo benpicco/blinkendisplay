@@ -1,6 +1,6 @@
-#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
 #define FASTLED_ESP8266_DMA
 
+#include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <ESP8266WiFi.h>
 #include <FastLED.h>
