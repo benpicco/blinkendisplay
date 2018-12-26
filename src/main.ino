@@ -1,5 +1,3 @@
-#define FASTLED_ESP8266_DMA
-
 #include <SPI.h>
 #include <Adafruit_GFX.h>
 #include <ESP8266WiFi.h>
