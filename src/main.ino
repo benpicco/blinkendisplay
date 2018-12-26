@@ -44,6 +44,7 @@ void setup()
 	FastLED.clear(true);
 
 	matrix.begin();
+	matrix.setTextWrap(false);	// so getTextBounds() gives proper results
 
 	WiFi.begin("35C3-insecure");
 	Udp.begin(UDP_PORT);
@@ -125,7 +126,6 @@ static void draw_string(void) {
 
 		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &width_txt, &h);
 		x = matrix.width();
-		width_txt *= 2; // why is this needed?
 
 		if (++pass >= ARRAYSIZE(colors))
 			pass = 0;
