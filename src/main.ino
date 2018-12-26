@@ -38,7 +38,7 @@ void setup()
 {
 	FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
 	FastLED.setCorrection(TypicalLEDStrip);
-	FastLED.setBrightness(5);	// low brightness so we can test the strip just using USB
+	FastLED.setBrightness(16);	// low brightness so we can test the strip just using USB
 	FastLED.clear(true);
 
 	matrix.begin();
@@ -88,13 +88,32 @@ static void rx_string(char* dst, size_t n) {
 	string_pending = true;
 }
 
-static void draw_string(void) {
-	const uint16_t colors[] = {
-		matrix.Color(255, 0, 0),
-		matrix.Color(0, 255, 0),
-		matrix.Color(0, 0, 255)};
+static inline uint8_t _get_color_cos(int frame, float period_mod) {
+    return cos8(frame * period_mod);
+}
 
-	static int pass, x;
+static void rgb_cycle(uint32_t frame, const uint32_t frames_per_color, uint8_t* r, uint8_t* g, uint8_t* b) {
+    *r = 0;
+    *g = 0;
+    *b = 0;
+
+    const float period_mod = 0xff / (float) frames_per_color;
+    const uint32_t half_period = frames_per_color / 2;
+    frame = frame % (3 * half_period);
+
+    if (frame <= half_period)
+        *r = _get_color_cos(frame, period_mod);
+    if (frame <= 2 * half_period)
+        *g = _get_color_cos(frame - half_period, period_mod);
+    if (frame >= half_period)
+        *b = _get_color_cos(frame - 2 * half_period, period_mod);
+    if (frame >= 2 * half_period)
+        *r = _get_color_cos(frame - 3 * half_period, period_mod);
+}
+
+static void draw_string(void) {
+
+	static int x;
 	static uint16_t width_txt;
 
 	matrix.clear();
@@ -113,7 +132,7 @@ static void draw_string(void) {
 			switch (WiFi.status()) {
 				case WL_CONNECTED:
 					text_ttl = 16;
-					snprintf(strbuffer[active_buffer], STRLEN_MAX, "UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 			}
 		} else
@@ -124,10 +143,6 @@ static void draw_string(void) {
 
 		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &width_txt, &h);
 		x = matrix.width();
-
-		if (++pass >= ARRAYSIZE(colors))
-			pass = 0;
-		matrix.setTextColor(colors[pass]);
 	}
 }
 
@@ -135,11 +150,15 @@ static void draw_string(void) {
 void loop()
 {
 	static unsigned i;
-	FastLED.setBrightness(5 + sin8(++i) / 8);
+
+	uint8_t r, g, b;
+	rgb_cycle(i, 300, &r, &g, &b);
+	matrix.setTextColor(matrix.Color(r, g, b));
 
 	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
 	draw_string();
 
 	matrix.show();
 	delay(30);
+	++i;
 }
