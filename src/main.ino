@@ -95,14 +95,14 @@ static void draw_string(void) {
 		matrix.Color(0, 255, 0),
 		matrix.Color(0, 0, 255)};
 
-	static int pass, bounds;
-	static int x;
+	static int pass, x;
+	static uint16_t width_txt;
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
 	matrix.print(strbuffer[active_buffer]);
 
-	if (++x > matrix.width()) {
+	if (--x < -width_txt) {
 
 		if (string_pending) {
 			string_pending = false;
@@ -120,11 +120,12 @@ static void draw_string(void) {
 		} else
 			--text_ttl;
 
-		int16_t  x1, y1; // can these be NULL?
-		uint16_t w, h;
+		int16_t  x1, y1; // getTextBounds() doesn't accept NULL
+		uint16_t h;	 // for parameters we are not intrested in
 
-		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &w, &h);
-		x = -2*w;
+		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &width_txt, &h);
+		x = matrix.width();
+		width_txt *= 2; // why is this needed?
 
 		if (++pass >= ARRAYSIZE(colors))
 			pass = 0;
