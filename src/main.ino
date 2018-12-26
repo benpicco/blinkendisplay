@@ -29,7 +29,9 @@ static FastLED_NeoMatrix matrix = FastLED_NeoMatrix(leds, M_WIDTH, M_HEIGHT, NEO
 
 static WiFiUDP Udp;
 
-static char strbuffer[STRLEN_MAX];
+static char strbuffer[2][STRLEN_MAX];
+static int active_buffer;
+static bool string_pending;
 
 void setup()
 {
@@ -65,32 +67,30 @@ static void send_reply(const char* msg) {
 	Udp.endPacket();
 }
 
-static void rx_string(void) {
-	char buffer[STRLEN_MAX];
-
+static void rx_string(char* dst, size_t n) {
 	int len = Udp.parsePacket();
 
-	if (len <= 0 || len > sizeof(buffer))
+	if (len <= 0 || len > n)
 		return;
 
-	len = Udp.read(buffer, sizeof(buffer));
+	len = Udp.read(dst, n);
 
 	if (len <= 0)
 		return;
-	buffer[len] = 0;
+	dst[len] = 0;
 
-	if (!is_sane_string(buffer, len)) {
+	if (!is_sane_string(dst, len)) {
 		send_reply("Invalid String\n");
 		return;
 	}
 
-	printf("Got String: '%s'\n", buffer);
+	printf("Got String: '%s'\n", dst);
 	send_reply("OK\n");
 
-	strncpy(buffer, strbuffer, sizeof(strbuffer));
+	string_pending = true;
 }
 
-static void draw_string(const char* string) {
+static void draw_string(void) {
 	const uint16_t colors[] = {
 		matrix.Color(255, 0, 0),
 		matrix.Color(0, 255, 0),
@@ -101,14 +101,19 @@ static void draw_string(const char* string) {
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
-	matrix.print(string);
+	matrix.print(strbuffer[active_buffer]);
 
 	if (++x > matrix.width()) {
+
+		if (string_pending) {
+			string_pending = false;
+			active_buffer = !active_buffer;
+		}
 
 		int16_t  x1, y1; // can these be NULL?
 		uint16_t w, h;
 
-		matrix.getTextBounds(string, 0, 0, &x1, &y1, &w, &h);
+		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &w, &h);
 		x = -w;
 
 		if (++pass >= ARRAYSIZE(colors))
@@ -120,8 +125,8 @@ static void draw_string(const char* string) {
 
 void loop()
 {
-	rx_string();
-	draw_string(strbuffer);
+	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
+	draw_string();
 
 //	matrix.show();
 	delay(30);
