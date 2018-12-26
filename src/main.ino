@@ -63,6 +63,8 @@ static bool is_sane_string(char* s, size_t len) {
 static void send_reply(const char* msg) {
 	Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
 	Udp.write(msg);
+	Udp.write("Previous msg: ");
+	Udp.write(strbuffer[active_buffer]);
 	Udp.endPacket();
 }
 
