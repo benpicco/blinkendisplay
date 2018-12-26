@@ -17,7 +17,9 @@
 #define M_HEIGHT	8	// the height of the LED matrix
 #define NUM_LEDS	(M_WIDTH*M_HEIGHT)
 
-#define STRLEN_MAX 128
+#define STRLEN_MAX	128
+#define UDP_PORT	1337
+#define TEXT_TTL	16
 
 // change WS2812B to match your type of LED, if different
 // list of supported types is here:
@@ -32,6 +34,7 @@ static WiFiUDP Udp;
 static char strbuffer[2][STRLEN_MAX];
 static int active_buffer;
 static bool string_pending;
+static int text_ttl;
 
 void setup()
 {
@@ -46,7 +49,7 @@ void setup()
 	matrix.begin();
 
 	WiFi.begin("35C3-insecure");
-	Udp.begin(1337);
+	Udp.begin(UDP_PORT);
 }
 
 static bool is_sane_string(char* s, size_t len) {
@@ -102,13 +105,25 @@ static void draw_string(void) {
 	matrix.clear();
 	matrix.setCursor(x, 0);
 	matrix.print(strbuffer[active_buffer]);
+	Serial.println(strbuffer[active_buffer]);
 
 	if (++x > matrix.width()) {
 
 		if (string_pending) {
 			string_pending = false;
 			active_buffer = !active_buffer;
+			text_ttl = TEXT_TTL;
 		}
+
+		if (text_ttl == 0) {
+			switch (WiFi.status()) {
+				case WL_CONNECTED:
+					text_ttl = 16;
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
+					break;
+			}
+		} else
+			--text_ttl;
 
 		int16_t  x1, y1; // can these be NULL?
 		uint16_t w, h;
