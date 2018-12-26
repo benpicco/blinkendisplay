@@ -134,6 +134,9 @@ static void draw_string(void) {
 
 void loop()
 {
+	static unsigned i;
+	FastLED.setBrightness(5 + sin8(++i) / 8);
+
 	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
 	draw_string();
 
