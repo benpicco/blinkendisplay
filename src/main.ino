@@ -38,13 +38,10 @@ static int text_ttl;
 
 void setup()
 {
-	Serial.begin(115200);
-	Serial.println("Hello World!");
-
-//	FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-//	FastLED.setCorrection(TypicalLEDStrip);
-//	FastLED.setBrightness(5);	// low brightness so we can test the strip just using USB
-//	FastLED.clear(true);
+	FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
+	FastLED.setCorrection(TypicalLEDStrip);
+	FastLED.setBrightness(5);	// low brightness so we can test the strip just using USB
+	FastLED.clear(true);
 
 	matrix.begin();
 
@@ -87,7 +84,6 @@ static void rx_string(char* dst, size_t n) {
 		return;
 	}
 
-	printf("Got String: '%s'\n", dst);
 	send_reply("OK\n");
 
 	string_pending = true;
@@ -105,7 +101,6 @@ static void draw_string(void) {
 	matrix.clear();
 	matrix.setCursor(x, 0);
 	matrix.print(strbuffer[active_buffer]);
-	Serial.println(strbuffer[active_buffer]);
 
 	if (++x > matrix.width()) {
 
@@ -129,7 +124,7 @@ static void draw_string(void) {
 		uint16_t w, h;
 
 		matrix.getTextBounds(strbuffer[active_buffer], 0, 0, &x1, &y1, &w, &h);
-		x = -w;
+		x = -2*w;
 
 		if (++pass >= ARRAYSIZE(colors))
 			pass = 0;
@@ -143,6 +138,6 @@ void loop()
 	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
 	draw_string();
 
-//	matrix.show();
+	matrix.show();
 	delay(30);
 }
