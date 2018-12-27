@@ -49,7 +49,7 @@ void setup()
 }
 
 static bool is_sane_string(char* s, size_t len) {
-	static bool is_empty = true;
+	bool is_empty = true;
 	for (; *s && len--; ++s) {
 		if (*s == '\n' || *s == '\r')
 			*s = ' ';
@@ -57,7 +57,7 @@ static bool is_sane_string(char* s, size_t len) {
 		if (*s < ' ')
 			return false;
 
-		if (isspace(*s))
+		if (!isspace(*s))
 			is_empty = false;
 	}
 
