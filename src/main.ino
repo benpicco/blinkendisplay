@@ -182,10 +182,8 @@ static void draw_string(void) {
 	matrix.clear();
 	matrix.setCursor(x, 0);
 
-	if (wobbly)
-		plasma_print(strbuffer[active_buffer], wobbly);
-	else
-		rainbow_print(strbuffer[active_buffer], wobbly);
+//	plasma_print(strbuffer[active_buffer], wobbly);
+	rainbow_print(strbuffer[active_buffer], wobbly);
 
 	if (--x < -width_txt) {
 
