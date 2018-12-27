@@ -212,7 +212,7 @@ static void draw_string(void) {
 
 void loop()
 {
-	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
+	rx_string(strbuffer[!active_buffer], STRLEN_MAX);
 	draw_string();
 
 	matrix.show();
