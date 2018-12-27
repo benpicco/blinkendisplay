@@ -49,15 +49,19 @@ void setup()
 }
 
 static bool is_sane_string(char* s, size_t len) {
+	static bool is_empty = true;
 	for (; *s && len--; ++s) {
 		if (*s == '\n' || *s == '\r')
 			*s = ' ';
 
-		if (*s < ' ' || *s > '~')
+		if (*s < ' ')
 			return false;
+
+		if (isspace(*s))
+			is_empty = false;
 	}
 
-	return true;
+	return !is_empty;
 }
 
 static void send_reply(const char* msg) {
@@ -71,8 +75,10 @@ static void send_reply(const char* msg) {
 static void rx_string(char* dst, size_t n) {
 	int len = Udp.parsePacket();
 
-	if (len <= 0 || len > n)
+	if (len <= 0 || len > n) {
+		send_reply("Invalid String\n");
 		return;
+	}
 
 	len = Udp.read(dst, n);
 
