@@ -166,8 +166,8 @@ static void rainbow_print(const char* s, bool wobbly) {
 
 	for (; *s; ++s) {
 		if (wobbly)
-			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(i/8 + 8 * matrix.getCursorX()) / 255);
-		rgb_cycle(++i - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
+			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
+		rgb_cycle(++i/2 - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
 		matrix.setTextColor(matrix.Color(r, g, b));
 		matrix.print(*s);
 	}
