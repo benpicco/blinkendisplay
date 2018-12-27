@@ -203,6 +203,9 @@ static void draw_string(void) {
 					wobbly = true;
 					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
+				default:
+					text_ttl = 1;
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "trying to connect to %s...", WiFi.SSID().c_str());
 			}
 		} else
 			--text_ttl;
