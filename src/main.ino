@@ -113,6 +113,17 @@ static void rgb_cycle(uint32_t frame, const uint32_t frames_per_color, uint8_t* 
         *r = _get_color_cos(frame - 3 * half_period, period_mod);
 }
 
+static void rainbow_print(const char* s) {
+	static unsigned i;
+	uint8_t r, g, b;
+
+	for (; *s; ++s) {
+		rgb_cycle(++i, 1000, &r, &g, &b);
+		matrix.setTextColor(matrix.Color(r, g, b));
+		matrix.print(*s);
+	}
+}
+
 static void draw_string(void) {
 
 	static int x;
@@ -120,7 +131,7 @@ static void draw_string(void) {
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
-	matrix.print(strbuffer[active_buffer]);
+	rainbow_print(strbuffer[active_buffer]);
 
 	if (--x < -width_txt) {
 
@@ -151,16 +162,9 @@ static void draw_string(void) {
 
 void loop()
 {
-	static unsigned i;
-
-	uint8_t r, g, b;
-	rgb_cycle(i, 300, &r, &g, &b);
-	matrix.setTextColor(matrix.Color(r, g, b));
-
 	rx_string(strbuffer[!active_buffer], sizeof(strbuffer));
 	draw_string();
 
 	matrix.show();
 	delay(30);
-	++i;
 }
