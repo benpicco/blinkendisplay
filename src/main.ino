@@ -113,14 +113,55 @@ static void rgb_cycle(uint32_t frame, const uint32_t frames_per_color, uint8_t* 
         *r = _get_color_cos(frame - 3 * half_period, period_mod);
 }
 
+static CRGBPalette16 currentPalette = RainbowColors_p;
+static CRGB currentColor;
+
+static CRGB ColorFromCurrentPalette(uint8_t index = 0, uint8_t brightness = 255, TBlendType blendType = LINEARBLEND) {
+  return ColorFromPalette(currentPalette, index, brightness, blendType);
+}
+
+static void plasma_print(const char* s, bool wobbly) {
+	static int time, cycles;
+
+	for (int x = 0; x <  matrix.width(); x++) {
+		for (int y = 0; y <  matrix.height(); y++) {
+			int16_t v = 0;
+			uint8_t wibble = sin8(time);
+			v += sin16(x * wibble * 3 + time);
+			v += cos16(y * (128 - wibble)  + time);
+			v += sin16(y * x * cos8(-time) / 8);
+
+			currentColor = ColorFromPalette(currentPalette, (v >> 8) + 127); //, brightness, currentBlendType);
+			matrix.drawPixel(x, y, matrix.Color(currentColor.r, currentColor.g, currentColor.b));
+		}
+	}
+
+	time += 1;
+	cycles++;
+
+	if (cycles >= 2048) {
+		time = 0;
+		cycles = 0;
+	}
+
+	matrix.setTextColor(matrix.Color(0, 0, 0));
+
+	if (wobbly)
+		for (; *s; ++s) {
+		matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(cycles/8 + 8 * matrix.getCursorX()) / 255);
+		matrix.print(*s);
+	} else
+		matrix.print(s);
+}
+
 static void rainbow_print(const char* s, bool wobbly) {
 	static unsigned i;
 	uint8_t r, g, b;
 
 	for (; *s; ++s) {
 		if (wobbly)
-                matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(i/8 + 8 * matrix.getCursorX()) / 255);
-        rgb_cycle(++i - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
+			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(i/8 + 8 * matrix.getCursorX()) / 255);
+		rgb_cycle(++i - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
 		matrix.setTextColor(matrix.Color(r, g, b));
 		matrix.print(*s);
 	}
@@ -134,7 +175,11 @@ static void draw_string(void) {
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
-	rainbow_print(strbuffer[active_buffer], wobbly);
+
+	if (wobbly)
+		plasma_print(strbuffer[active_buffer], wobbly);
+	else
+		rainbow_print(strbuffer[active_buffer], wobbly);
 
 	if (--x < -width_txt) {
 
