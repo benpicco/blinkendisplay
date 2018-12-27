@@ -113,12 +113,14 @@ static void rgb_cycle(uint32_t frame, const uint32_t frames_per_color, uint8_t* 
         *r = _get_color_cos(frame - 3 * half_period, period_mod);
 }
 
-static void rainbow_print(const char* s) {
+static void rainbow_print(const char* s, bool wobbly) {
 	static unsigned i;
 	uint8_t r, g, b;
 
 	for (; *s; ++s) {
-		rgb_cycle(++i, 1000, &r, &g, &b);
+		if (wobbly)
+                matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(i/8 + 8 * matrix.getCursorX()) / 255);
+        rgb_cycle(++i - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
 		matrix.setTextColor(matrix.Color(r, g, b));
 		matrix.print(*s);
 	}
@@ -128,14 +130,16 @@ static void draw_string(void) {
 
 	static int x;
 	static uint16_t width_txt;
+	static bool wobbly;
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
-	rainbow_print(strbuffer[active_buffer]);
+	rainbow_print(strbuffer[active_buffer], wobbly);
 
 	if (--x < -width_txt) {
 
 		if (string_pending) {
+			wobbly = false;
 			string_pending = false;
 			active_buffer = !active_buffer;
 			text_ttl = TEXT_TTL;
@@ -145,6 +149,7 @@ static void draw_string(void) {
 			switch (WiFi.status()) {
 				case WL_CONNECTED:
 					text_ttl = 16;
+					wobbly = true;
 					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 			}
