@@ -257,7 +257,7 @@ static void draw_string(uint8_t current_flags) {
 			switch (WiFi.status()) {
 				case WL_CONNECTED:
 					text_ttl = 16;
-					flags[active_buffer] |= FLAG_WOBBLY;
+					flags[active_buffer] = FLAG_WOBBLY; // reset flags
 					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
