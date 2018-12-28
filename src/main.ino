@@ -29,6 +29,11 @@ static FastLED_NeoMatrix matrix = FastLED_NeoMatrix(leds, M_WIDTH, M_HEIGHT, NEO
 
 static WiFiUDP Udp;
 
+#define FLAG_VALID	(1 << 0)
+#define FLAG_WOBBLY 	(1 << 1)
+#define FLAG_PLASMA 	(1 << 2)
+
+static uint8_t flags[2];
 static char strbuffer[2][STRLEN_MAX];
 static int active_buffer;
 static bool string_pending;
@@ -48,20 +53,69 @@ void setup()
 	Udp.begin(UDP_PORT);
 }
 
-static bool is_sane_string(char* s, size_t len) {
-	bool is_empty = true;
+static void strip_umlaut(unsigned char* str, size_t size) {
+
+	for (; *str && --size; ++str) {
+		if (*str == 195 && size > 1) {
+			switch (*(str+1)) {
+			case 164: // ä
+				*str     = 'a';
+				*(str+1) = 'e';
+				break;
+			case 188: // ü
+				*str     = 'u';
+				*(str+1) = 'e';
+				break;
+			case 182: // ö
+				*str     = 'o';
+				*(str+1) = 'e';
+				break;
+			case 132: // Ä
+				*str     = 'A';
+				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
+				break;
+			case 156: // Ü
+				*str     = 'U';
+				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
+				break;
+			case 150: // Ö
+				*str     = 'O';
+				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
+				break;
+			case 159: // ß
+				*str     = 's';
+				*(str+1) = 's';
+				break;
+			}
+		}
+	}
+}
+
+static uint8_t process_string(char* s, size_t len) {
+	uint8_t flags = 0;
+
 	for (; *s && len--; ++s) {
 		if (*s == '\n' || *s == '\r')
 			*s = ' ';
 
-		if (*s < ' ')
-			return false;
+		if (*s < ' ') {
+			switch (*s) {
+				case '\a':
+					flags |= FLAG_WOBBLY;
+					*s = ' ';
+					break;
+				case '\b':
+					flags |= FLAG_PLASMA;
+					*s = ' ';
+					break;
+			}
+		}
 
 		if (!isspace(*s))
-			is_empty = false;
+			flags |= FLAG_VALID;
 	}
 
-	return !is_empty;
+	return flags;
 }
 
 static void send_reply(const char* msg) {
@@ -86,7 +140,10 @@ static void rx_string(char* dst, size_t n) {
 		return;
 	dst[len] = 0;
 
-	if (!is_sane_string(dst, len)) {
+	strip_umlaut((unsigned char*) dst, len);
+	uint8_t f = process_string(dst, len);
+
+	if (f & FLAG_VALID == 0) {
 		send_reply("Invalid String\n");
 		return;
 	}
@@ -94,6 +151,8 @@ static void rx_string(char* dst, size_t n) {
 	send_reply("OK\n");
 
 	string_pending = true;
+	flags[!active_buffer] = f;
+	return;
 }
 
 static inline uint8_t _get_color_cos(int frame, float period_mod) {
@@ -154,7 +213,7 @@ static void plasma_print(const char* s, bool wobbly) {
 
 	if (wobbly)
 		for (; *s; ++s) {
-		matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(cycles/8 + 8 * matrix.getCursorX()) / 255);
+		matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
 		matrix.print(*s);
 	} else
 		matrix.print(s);
@@ -173,22 +232,22 @@ static void rainbow_print(const char* s, bool wobbly) {
 	}
 }
 
-static void draw_string(void) {
+static void draw_string(uint8_t current_flags) {
 
 	static int x;
 	static uint16_t width_txt;
-	static bool wobbly;
 
 	matrix.clear();
 	matrix.setCursor(x, 0);
 
-//	plasma_print(strbuffer[active_buffer], wobbly);
-	rainbow_print(strbuffer[active_buffer], wobbly);
+	if (current_flags & FLAG_PLASMA)
+		plasma_print(strbuffer[active_buffer], current_flags & FLAG_WOBBLY);
+	else
+		rainbow_print(strbuffer[active_buffer], current_flags & FLAG_WOBBLY);
 
 	if (--x < -width_txt) {
 
 		if (string_pending) {
-			wobbly = false;
 			string_pending = false;
 			active_buffer = !active_buffer;
 			text_ttl = TEXT_TTL;
@@ -198,7 +257,7 @@ static void draw_string(void) {
 			switch (WiFi.status()) {
 				case WL_CONNECTED:
 					text_ttl = 16;
-					wobbly = true;
+					flags[active_buffer] |= FLAG_WOBBLY;
 					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
@@ -220,7 +279,7 @@ static void draw_string(void) {
 void loop()
 {
 	rx_string(strbuffer[!active_buffer], STRLEN_MAX);
-	draw_string();
+	draw_string(flags[active_buffer]);
 
 	matrix.show();
 	delay(30);
