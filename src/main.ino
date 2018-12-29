@@ -7,6 +7,9 @@
 
 #define ARRAYSIZE(a) (sizeof(a) / sizeof(*a))
 
+#define min(a, b) ((a) > (b) ? (b) : (a))
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
 // fast led constants
 #define DATA_PIN	3	// labeled as RX on nodeMCU
 #define COLOR_ORDER	GRB	// if colors are mismatched; change this
@@ -30,6 +33,7 @@ static FastLED_NeoMatrix matrix = FastLED_NeoMatrix(leds, M_WIDTH, M_HEIGHT, NEO
 static WiFiUDP Udp;
 
 #define FLAG_VALID	(1 << 0)
+#define FLAG_FIRE	(1 << 1)
 #define FLAG_PLASMA 	(1 << 2)
 
 static uint8_t flags[2];
@@ -37,6 +41,39 @@ static char strbuffer[2][STRLEN_MAX];
 static int active_buffer;
 static bool string_pending;
 static int text_ttl;
+
+static uint8_t fire_matrix[M_HEIGHT+1][M_WIDTH];
+
+static void init_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
+	memset(fire[h], 255, w);
+}
+
+// COOLING: How much does the air cool as it rises?
+// Less cooling = taller flames.  More cooling = shorter flames.
+// Default 55, suggested range 20-100
+#define COOLING  55
+
+static void draw_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
+	for (int x = 0 ; x < w; ++x) {
+
+		// Step 1.  Cool down every cell a little
+		for(int y = 0; y < h; ++y) {
+			fire[y][x] = qsub8(fire[y][x],  random8(0, ((COOLING * 10) / h) + 2));
+		}
+
+		// Step 2.  Heat from each cell drifts 'up' and diffuses a little
+		for(int y = h - 1; y >= 0; --y) {
+			unsigned _x = random8(max(0, x-1), min(w-1, x+1));
+			int new_val = fire[y + 1][_x] - random8(0, 64); 
+			fire[y][x] = new_val < 0 ? 0 : new_val;
+		}
+
+		for (int y = 0; y < h; ++y) {
+			CRGB color = HeatColor(scale8(fire[y][x], 240));
+			matrix.drawPixel(x, y, matrix.Color(color.r, color.g, color.b));
+		}
+	}
+}
 
 void setup()
 {
@@ -50,6 +87,8 @@ void setup()
 
 	WiFi.begin("35C3-insecure");
 	Udp.begin(UDP_PORT);
+
+	init_fire(fire_matrix, M_WIDTH, M_HEIGHT);
 }
 
 static void strip_umlaut(unsigned char* str, size_t size) {
@@ -103,6 +142,10 @@ static uint8_t process_string(char* s, size_t len) {
 			switch (*s) {
 				case '\b':
 					flags |= FLAG_PLASMA;
+					*s = ' ';
+					break;
+				case '\f':
+					flags |= FLAG_FIRE;
 					*s = ' ';
 					break;
 			}
@@ -181,7 +224,31 @@ static CRGB ColorFromCurrentPalette(uint8_t index = 0, uint8_t brightness = 255,
   return ColorFromPalette(currentPalette, index, brightness, blendType);
 }
 
-static void plasma_print(const char* s) {
+static void rainbow_print(const char* s, bool random_color) {
+	static unsigned i;
+	CRGB color = CRGB::Black;
+	bool wobbly = false;
+
+	for (; *s; ++s) {
+		if (*s == '\a') {
+			wobbly = !wobbly;
+			continue;
+		}
+
+		if (wobbly)
+			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
+		else
+			matrix.setCursor(matrix.getCursorX(), 0);
+
+		if (random_color)
+			rgb_cycle(++i/2 - 10 * matrix.getCursorX(), 1000, &color.r, &color.g, &color.b);
+
+		matrix.setTextColor(matrix.Color(color.r, color.g, color.b));
+		matrix.print(*s);
+	}
+}
+
+static void draw_plasma(void) {
 	static int time, cycles;
 
 	for (int x = 0; x <  matrix.width(); x++) {
@@ -204,46 +271,6 @@ static void plasma_print(const char* s) {
 		time = 0;
 		cycles = 0;
 	}
-
-	matrix.setTextColor(matrix.Color(0, 0, 0));
-
-	bool wobbly = false;
-	for (; *s; ++s) {
-
-		if (*s == '\a') {
-			wobbly = !wobbly;
-			continue;
-		}
-
-		if (wobbly)
-			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
-		else
-			matrix.setCursor(matrix.getCursorX(), 0);
-
-		matrix.print(*s);
-	}
-}
-
-static void rainbow_print(const char* s) {
-	static unsigned i;
-	uint8_t r, g, b;
-	bool wobbly = false;
-
-	for (; *s; ++s) {
-		if (*s == '\a') {
-			wobbly = !wobbly;
-			continue;
-		}
-
-		if (wobbly)
-			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
-		else
-			matrix.setCursor(matrix.getCursorX(), 0);
-
-		rgb_cycle(++i/2 - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
-		matrix.setTextColor(matrix.Color(r, g, b));
-		matrix.print(*s);
-	}
 }
 
 static void draw_string(uint8_t current_flags) {
@@ -254,10 +281,17 @@ static void draw_string(uint8_t current_flags) {
 	matrix.clear();
 	matrix.setCursor(x, 0);
 
-	if (current_flags & FLAG_PLASMA)
-		plasma_print(strbuffer[active_buffer]);
-	else
-		rainbow_print(strbuffer[active_buffer]);
+	bool random = true;
+	if (current_flags & FLAG_PLASMA) {
+		random = false;
+		draw_plasma();
+	}
+	else if (current_flags & FLAG_FIRE) {
+		random = false;
+		draw_fire(fire_matrix, M_WIDTH, M_HEIGHT);
+	}
+
+	rainbow_print(strbuffer[active_buffer], random);
 
 	if (--x < -width_txt) {
 
@@ -272,6 +306,7 @@ static void draw_string(uint8_t current_flags) {
 				case WL_CONNECTED:
 					text_ttl = 16;
 					flags[active_buffer] = 0;
+//					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", "led.ecohackerfarm.org", UDP_PORT);
 					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
