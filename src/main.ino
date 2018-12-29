@@ -95,8 +95,10 @@ static uint8_t process_string(char* s, size_t len) {
 	uint8_t flags = 0;
 
 	for (; *s && len--; ++s) {
-		if (*s == '\n' || *s == '\r')
+		if (*s == '\n' || *s == '\r') {
 			*s = ' ';
+			continue;
+		}
 
 		if (*s < ' ') {
 			switch (*s) {
@@ -127,21 +129,22 @@ static void send_reply(const char* msg) {
 static void rx_string(char* dst, size_t n) {
 	int len = Udp.parsePacket();
 
+	if (len <= 0)
+		return;
+
+	dst[0] = 0; // len == 0 should be detected - why check twice?
+	len = Udp.read(dst, n);
+
 	if (len <= 0 || len > n) {
 		send_reply("Invalid String\n");
 		return;
 	}
-
-	len = Udp.read(dst, n);
-
-	if (len <= 0)
-		return;
 	dst[len] = 0;
 
 	strip_umlaut((unsigned char*) dst, len);
 	uint8_t f = process_string(dst, len);
 
-	if (f & FLAG_VALID == 0) {
+	if ((f & FLAG_VALID) == 0) {
 		send_reply("Invalid String\n");
 		return;
 	}
@@ -256,7 +259,8 @@ static void draw_string(uint8_t current_flags) {
 				case WL_CONNECTED:
 					text_ttl = 16;
 					flags[active_buffer] = FLAG_WOBBLY; // reset flags
-					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", "led.ecohackerfarm.org", UDP_PORT);
+//					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
 					text_ttl = 1;
