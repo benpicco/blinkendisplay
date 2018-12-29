@@ -30,7 +30,6 @@ static FastLED_NeoMatrix matrix = FastLED_NeoMatrix(leds, M_WIDTH, M_HEIGHT, NEO
 static WiFiUDP Udp;
 
 #define FLAG_VALID	(1 << 0)
-#define FLAG_WOBBLY 	(1 << 1)
 #define FLAG_PLASMA 	(1 << 2)
 
 static uint8_t flags[2];
@@ -102,10 +101,6 @@ static uint8_t process_string(char* s, size_t len) {
 
 		if (*s < ' ') {
 			switch (*s) {
-				case '\a':
-					flags |= FLAG_WOBBLY;
-					*s = ' ';
-					break;
 				case '\b':
 					flags |= FLAG_PLASMA;
 					*s = ' ';
@@ -186,7 +181,7 @@ static CRGB ColorFromCurrentPalette(uint8_t index = 0, uint8_t brightness = 255,
   return ColorFromPalette(currentPalette, index, brightness, blendType);
 }
 
-static void plasma_print(const char* s, bool wobbly) {
+static void plasma_print(const char* s) {
 	static int time, cycles;
 
 	for (int x = 0; x <  matrix.width(); x++) {
@@ -212,21 +207,39 @@ static void plasma_print(const char* s, bool wobbly) {
 
 	matrix.setTextColor(matrix.Color(0, 0, 0));
 
-	if (wobbly)
-		for (; *s; ++s) {
-		matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
-		matrix.print(*s);
-	} else
-		matrix.print(s);
-}
-
-static void rainbow_print(const char* s, bool wobbly) {
-	static unsigned i;
-	uint8_t r, g, b;
-
+	bool wobbly = false;
 	for (; *s; ++s) {
+
+		if (*s == '\a') {
+			wobbly = !wobbly;
+			continue;
+		}
+
 		if (wobbly)
 			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
+		else
+			matrix.setCursor(matrix.getCursorX(), 0);
+
+		matrix.print(*s);
+	}
+}
+
+static void rainbow_print(const char* s) {
+	static unsigned i;
+	uint8_t r, g, b;
+	bool wobbly = false;
+
+	for (; *s; ++s) {
+		if (*s == '\a') {
+			wobbly = !wobbly;
+			continue;
+		}
+
+		if (wobbly)
+			matrix.setCursor(matrix.getCursorX(), 2 - 4 * sin8(8 * matrix.getCursorX()) / 255);
+		else
+			matrix.setCursor(matrix.getCursorX(), 0);
+
 		rgb_cycle(++i/2 - 10 * matrix.getCursorX(), 1000, &r, &g, &b);
 		matrix.setTextColor(matrix.Color(r, g, b));
 		matrix.print(*s);
@@ -242,9 +255,9 @@ static void draw_string(uint8_t current_flags) {
 	matrix.setCursor(x, 0);
 
 	if (current_flags & FLAG_PLASMA)
-		plasma_print(strbuffer[active_buffer], current_flags & FLAG_WOBBLY);
+		plasma_print(strbuffer[active_buffer]);
 	else
-		rainbow_print(strbuffer[active_buffer], current_flags & FLAG_WOBBLY);
+		rainbow_print(strbuffer[active_buffer]);
 
 	if (--x < -width_txt) {
 
@@ -258,9 +271,8 @@ static void draw_string(uint8_t current_flags) {
 			switch (WiFi.status()) {
 				case WL_CONNECTED:
 					text_ttl = 16;
-					flags[active_buffer] = FLAG_WOBBLY; // reset flags
-					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", "led.ecohackerfarm.org", UDP_PORT);
-//					snprintf(strbuffer[active_buffer], STRLEN_MAX, "Send me Text! - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
+					flags[active_buffer] = 0;
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
 					text_ttl = 1;
