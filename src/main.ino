@@ -109,9 +109,7 @@ static uint8_t process_string(char* s, size_t len) {
 					*s = ' ';
 					break;
 			}
-		}
-
-		if (!isspace(*s))
+		} else if (!isspace(*s))
 			flags |= FLAG_VALID;
 	}
 
