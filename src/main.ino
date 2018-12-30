@@ -4,6 +4,7 @@
 #include <WiFiUdp.h>
 #include <FastLED.h>
 #include <FastLED_NeoMatrix.h>
+#include <fletcher16.h>
 
 #define ARRAYSIZE(a) (sizeof(a) / sizeof(*a))
 
@@ -18,9 +19,10 @@
 #define M_HEIGHT	8	// the height of the LED matrix
 #define NUM_LEDS	(M_WIDTH*M_HEIGHT)
 
-#define STRLEN_MAX	128
+#define STRLEN_MAX	256
 #define UDP_PORT	1337
 #define TEXT_TTL	16
+#define MSG_HASH_SIZE 16
 
 // change WS2812B to match your type of LED, if different
 // list of supported types is here:
@@ -42,6 +44,9 @@ static int active_buffer;
 static bool string_pending;
 static int text_ttl;
 
+uint16_t msg_hashes[MSG_HASH_SIZE];
+int cur_hash_slot = 0;
+
 static uint8_t fire_matrix[M_HEIGHT+1][M_WIDTH];
 
 static void init_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
@@ -52,6 +57,14 @@ static void init_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
 // Less cooling = taller flames.  More cooling = shorter flames.
 // Default 55, suggested range 20-100
 #define COOLING  55
+
+static int check_msg_hashes(uint16_t msg){
+  for (int i = 0; i < MSG_HASH_SIZE; i++ ){
+    if ( msg == msg_hashes[i] )
+      return 1;
+  }
+  return 0;
+}
 
 static void draw_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
 	for (int x = 0 ; x < w; ++x) {
@@ -64,7 +77,7 @@ static void draw_fire(uint8_t fire[M_HEIGHT][M_WIDTH], unsigned w, unsigned h) {
 		// Step 2.  Heat from each cell drifts 'up' and diffuses a little
 		for(int y = h - 1; y >= 0; --y) {
 			unsigned _x = random8(max(0, x-1), min(w-1, x+1));
-			int new_val = fire[y + 1][_x] - random8(0, 64); 
+			int new_val = fire[y + 1][_x] - random8(0, 64);
 			fire[y][x] = new_val < 0 ? 0 : new_val;
 		}
 
@@ -82,8 +95,14 @@ void setup()
 	FastLED.setBrightness(16);	// low brightness so we can test the strip just using USB
 	FastLED.clear(true);
 
+
 	matrix.begin();
 	matrix.setTextWrap(false);	// so getTextBounds() gives proper results
+
+  // clear the 'ring buffer'
+  for (int i = 0; i < MSG_HASH_SIZE; i++ ){
+    msg_hashes[i] = 0;
+  }
 
 	WiFi.begin("35C3-insecure");
 	Udp.begin(UDP_PORT);
@@ -181,11 +200,19 @@ static void rx_string(char* dst, size_t n) {
 
 	strip_umlaut((unsigned char*) dst, len);
 	uint8_t f = process_string(dst, len);
+  uint16_t cur_hash = fletcher16((unsigned char *)dst, len);
+  if (check_msg_hashes(cur_hash) == 1){
+    send_reply("Please dohnut spam\n");
+    return;
+  }
 
 	if ((f & FLAG_VALID) == 0) {
 		send_reply("Invalid String\n");
 		return;
 	}
+
+  msg_hashes[cur_hash_slot] = cur_hash;
+  cur_hash_slot = (cur_hash_slot+1) % MSG_HASH_SIZE;
 
 	send_reply("OK\n");
 
