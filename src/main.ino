@@ -148,14 +148,14 @@ const struct dict {
 	},
 };
 
-static void str_contract(char* str, size_t offset, size_t len) {
+static void str_contract(unsigned char* str, size_t offset, size_t len) {
 	while (*str && --len) {
 		*str++ = str[offset];
 	}
 	*str = 0;
 }
 
-static uint8_t find_mapping(const char* c, size_t* len) {
+static uint8_t find_mapping(const unsigned char* c, size_t* len) {
 	for (int i = 0; i < ARRAYSIZE(mapping); ++i) {
 		if (memcmp(c, mapping[i].utf8, strlen(mapping[i].utf8)) == 0) {
 			*len = strlen(mapping[i].utf8) - 1;
@@ -166,12 +166,12 @@ static uint8_t find_mapping(const char* c, size_t* len) {
 	return 0;
 }
 
-static char* cp437_replace(char* str, size_t len) {
-	char* start = str;
+static size_t cp437_replace(unsigned char* str, size_t len) {
+	unsigned char* start = str;
 	uint8_t cp437;
 	size_t offset = 0;
 	while (*str && len) {
-		if (((unsigned) *str > 127) && (cp437 = find_mapping(str, &offset))) {
+		if ((*str > 127) && (cp437 = find_mapping(str, &offset))) {
 			*str = cp437;
 			len -= offset;
 			str_contract(++str, offset, len);
@@ -181,7 +181,7 @@ static char* cp437_replace(char* str, size_t len) {
 		}
 	}
 
-	return start;
+	return str - start;
 }
 
 static uint8_t process_string(char* s, size_t len) {
@@ -234,7 +234,7 @@ static void rx_string(char* dst, size_t n) {
 	}
 	dst[len] = 0;
 
-	cp437_replace(dst, len);
+	len = cp437_replace((unsigned char *)dst, len);
 	uint8_t f = process_string(dst, len);
 
 	uint16_t cur_hash = fletcher16((unsigned char *)dst, len);
