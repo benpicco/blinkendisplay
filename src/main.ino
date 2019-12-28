@@ -110,42 +110,78 @@ void setup()
 	init_fire(fire_matrix, M_WIDTH, M_HEIGHT);
 }
 
-static void strip_umlaut(unsigned char* str, size_t size) {
+const struct dict {
+	const char* utf8;
+	uint8_t cp437;
+} mapping[] = {
+	{
+		.utf8 = "ä",
+		.cp437 = 0x84
+	},
+	{
+		.utf8 = "ö",
+		.cp437 = 0x94
+	},
+	{
+		.utf8 = "ü",
+		.cp437 = 0x81
+	},
+	{
+		.utf8 = "Ä",
+		.cp437 = 0x8e
+	},
+	{
+		.utf8 = "Ö",
+		.cp437 = 0x99
+	},
+	{
+		.utf8 = "Ü",
+		.cp437 = 0x9a
+	},
+	{
+		.utf8 = "ß",
+		.cp437 = 0xe0
+	},
+	{
+		.utf8 = "!!",
+		.cp437 = 0x13
+	},
+};
 
-	for (; *str && --size; ++str) {
-		if (*str == 195 && size > 1) {
-			switch (*(str+1)) {
-			case 164: // ä
-				*str     = 'a';
-				*(str+1) = 'e';
-				break;
-			case 188: // ü
-				*str     = 'u';
-				*(str+1) = 'e';
-				break;
-			case 182: // ö
-				*str     = 'o';
-				*(str+1) = 'e';
-				break;
-			case 132: // Ä
-				*str     = 'A';
-				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
-				break;
-			case 156: // Ü
-				*str     = 'U';
-				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
-				break;
-			case 150: // Ö
-				*str     = 'O';
-				*(str+1) = isupper(*(str+2)) ? 'E' : 'e';
-				break;
-			case 159: // ß
-				*str     = 's';
-				*(str+1) = 's';
-				break;
-			}
+static void str_contract(char* str, size_t offset, size_t len) {
+	while (*str && --len) {
+		*str++ = str[offset];
+	}
+	*str = 0;
+}
+
+static uint8_t find_mapping(const char* c, size_t* len) {
+	for (int i = 0; i < ARRAYSIZE(mapping); ++i) {
+		if (memcmp(c, mapping[i].utf8, strlen(mapping[i].utf8)) == 0) {
+			*len = strlen(mapping[i].utf8) - 1;
+			return mapping[i].cp437;
 		}
 	}
+
+	return 0;
+}
+
+static char* cp437_replace(char* str, size_t len) {
+	char* start = str;
+	uint8_t cp437;
+	size_t offset = 0;
+	while (*str && len) {
+		if (((unsigned) *str > 127) && (cp437 = find_mapping(str, &offset))) {
+			*str = cp437;
+			len -= offset;
+			str_contract(++str, offset, len);
+		} else {
+			++str;
+			--len;
+		}
+	}
+
+	return start;
 }
 
 static uint8_t process_string(char* s, size_t len) {
@@ -198,7 +234,7 @@ static void rx_string(char* dst, size_t n) {
 	}
 	dst[len] = 0;
 
-	strip_umlaut((unsigned char*) dst, len);
+	cp437_replace(dst, len);
 	uint8_t f = process_string(dst, len);
 
 	uint16_t cur_hash = fletcher16((unsigned char *)dst, len);
