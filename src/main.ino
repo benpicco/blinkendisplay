@@ -104,7 +104,7 @@ void setup()
     msg_hashes[i] = 0;
   }
 
-	WiFi.begin("35C3-insecure");
+	WiFi.begin("36C3-insecure");
 	Udp.begin(UDP_PORT);
 
 	init_fire(fire_matrix, M_WIDTH, M_HEIGHT);
@@ -200,19 +200,20 @@ static void rx_string(char* dst, size_t n) {
 
 	strip_umlaut((unsigned char*) dst, len);
 	uint8_t f = process_string(dst, len);
-  uint16_t cur_hash = fletcher16((unsigned char *)dst, len);
-  if (check_msg_hashes(cur_hash) == 1){
-    send_reply("Please dohnut spam\n");
-    return;
-  }
+
+	uint16_t cur_hash = fletcher16((unsigned char *)dst, len);
+	if (check_msg_hashes(cur_hash) == 1){
+		send_reply("Please dohnut spam\n");
+		return;
+	}
 
 	if ((f & FLAG_VALID) == 0) {
 		send_reply("Invalid String\n");
 		return;
 	}
 
-  msg_hashes[cur_hash_slot] = cur_hash;
-  cur_hash_slot = (cur_hash_slot+1) % MSG_HASH_SIZE;
+	msg_hashes[cur_hash_slot] = cur_hash;
+	cur_hash_slot = (cur_hash_slot+1) % MSG_HASH_SIZE;
 
 	send_reply("OK\n");
 
@@ -222,7 +223,7 @@ static void rx_string(char* dst, size_t n) {
 }
 
 static inline uint8_t _get_color_cos(int frame, float period_mod) {
-    return cos8(frame * period_mod);
+	return cos8(frame * period_mod);
 }
 
 static void rgb_cycle(uint32_t frame, const uint32_t frames_per_color, uint8_t* r, uint8_t* g, uint8_t* b) {
@@ -248,7 +249,7 @@ static CRGBPalette16 currentPalette = RainbowColors_p;
 static CRGB currentColor;
 
 static CRGB ColorFromCurrentPalette(uint8_t index = 0, uint8_t brightness = 255, TBlendType blendType = LINEARBLEND) {
-  return ColorFromPalette(currentPalette, index, brightness, blendType);
+	return ColorFromPalette(currentPalette, index, brightness, blendType);
 }
 
 static void rainbow_print(const char* s, bool random_color) {
@@ -333,8 +334,8 @@ static void draw_string(uint8_t current_flags) {
 				case WL_CONNECTED:
 					text_ttl = 16;
 					flags[active_buffer] = 0;
-//					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", "led.ecohackerfarm.org", UDP_PORT);
-					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
+					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", "led.ecohacker.farm", UDP_PORT);
+//					snprintf(strbuffer[active_buffer], STRLEN_MAX, "\aSend me Text!\a - UDP %s:%d", WiFi.localIP().toString().c_str(), UDP_PORT);
 					break;
 				default:
 					text_ttl = 1;
